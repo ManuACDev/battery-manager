@@ -1,0 +1,30 @@
+# Ignorar carpetas de salida de Eclipse
+/bin/
+gen/
+
+# Archivos y carpetas de configuración específica del IDE
+.settings/
+.classpath
+.project
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Archivos generados por compilaciones
+*.class
+*.jar
+*.war
+*.ear
+
+# Archivos temporales
+*.tmp
+*.swp
+
+# Configuraciones personales
+*.iml
+.idea/
+
