@@ -65,9 +65,14 @@ public class BatteryManager extends Application {
             batteryStatusLabel.setText("Battery Status: Not available");
         } else {
             PowerSource powerSource = powerSources.get(0);
-            double remainingCapacity = (powerSource.getCurrentCapacity() / powerSource.getMaxCapacity()) * 100;
-            batteryPercentageLabel.setText("Battery Percentage: " + String.format("%.0f", remainingCapacity) + "%");
-            batteryStatusLabel.setText("Battery Status: " + (powerSource.isCharging() ? "Charging" : "Not Charging"));
+            double maxCapacity = powerSource.getMaxCapacity();
+            double remainingCapacity = maxCapacity > 0 
+                    ? (powerSource.getCurrentCapacity() / maxCapacity) * 100 
+                    : 0;
+            
+            batteryPercentageLabel.setText("Battery Percentage: " + 
+                    (maxCapacity > 0 ? String.format("%.0f", remainingCapacity) + "%" : "Unavailable"));
+                batteryStatusLabel.setText("Battery Status: " + (powerSource.isCharging() ? "Charging" : "Not Charging"));
         }
     }
     
