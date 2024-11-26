@@ -4,6 +4,7 @@ package com.battery.manager;
 import java.util.List;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -23,6 +24,9 @@ public class BatteryManager extends Application {
     private Label batteryStatusLabel;
     private Button toggleChargeButton;
     private boolean useDirectPower = false;
+    private volatile boolean running = true;
+    private SystemInfo systemInfo; 
+    private HardwareAbstractionLayer hal;
     
     public static void main(String[] args) {
         launch(args);
@@ -50,29 +54,68 @@ public class BatteryManager extends Application {
         Scene scene = new Scene(layout, 300, 200);
         primaryStage.setScene(scene);
         primaryStage.show();
+        
+        // Instanciar SystemInfo y HardwareAbstractionLayer 
+        systemInfo = new SystemInfo(); 
+        hal = systemInfo.getHardware();
 
-        // Actualizar información de la batería al iniciar
-        updateBatteryInfo();
+        // Iniciar el hilo para actualizar la información de la batería
+        startBatteryInfoUpdater();
+
+        // Detener el hilo al cerrar la ventana
+        primaryStage.setOnCloseRequest(event -> stopUpdaterThread());
+    }
+    
+    private void startBatteryInfoUpdater() {
+        Thread updaterThread = new Thread(() -> {
+            while (running) {
+                try {
+                    // Actualizar información de la batería
+                    updateBatteryInfo();
+
+                    // Pausar el hilo por 5 segundos
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt(); // Restaurar el estado de interrupción
+                    break;
+                }
+            }
+        });
+
+        updaterThread.setDaemon(true); // Terminar el hilo automáticamente al cerrar la aplicación
+        updaterThread.start();
+    }
+    
+    private void stopUpdaterThread() {
+        running = false;
     }
     
     private void updateBatteryInfo() {
-        SystemInfo systemInfo = new SystemInfo();
-        HardwareAbstractionLayer hal = systemInfo.getHardware();
-
         List<PowerSource> powerSources = hal.getPowerSources();
         if (powerSources.isEmpty()) {
-            batteryPercentageLabel.setText("Battery Percentage: No battery found");
-            batteryStatusLabel.setText("Battery Status: Not available");
+            Platform.runLater(() -> {
+                batteryPercentageLabel.setText("Battery Percentage: No battery found");
+                batteryStatusLabel.setText("Battery Status: Not available");
+            });
         } else {
             PowerSource powerSource = powerSources.get(0);
+            double currentCapacity = powerSource.getCurrentCapacity();
             double maxCapacity = powerSource.getMaxCapacity();
-            double remainingCapacity = maxCapacity > 0 
-                    ? (powerSource.getCurrentCapacity() / maxCapacity) * 100 
-                    : 0;
             
-            batteryPercentageLabel.setText("Battery Percentage: " + 
-                    (maxCapacity > 0 ? String.format("%.0f", remainingCapacity) + "%" : "Unavailable"));
-                batteryStatusLabel.setText("Battery Status: " + (powerSource.isCharging() ? "Charging" : "Not Charging"));
+            // Validar que currentCapacity y maxCapacity
+            if (currentCapacity > 0 && maxCapacity > 0) {
+            	double remainingCapacity = (currentCapacity / maxCapacity) * 100;
+
+                Platform.runLater(() -> {
+                	batteryPercentageLabel.setText("Battery Percentage: " + String.format("%.0f", remainingCapacity) + "%");
+                    batteryStatusLabel.setText("Battery Status: " + (powerSource.isCharging() ? "Charging" : "Not Charging"));
+                });
+			} else {
+				Platform.runLater(() -> { 
+					batteryPercentageLabel.setText("Battery Percentage: Invalid data"); 
+					batteryStatusLabel.setText("Battery Status: Not available"); 
+				});
+			}
         }
     }
     
