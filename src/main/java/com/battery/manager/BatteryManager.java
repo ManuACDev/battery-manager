@@ -10,15 +10,11 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import oshi.SystemInfo;
@@ -30,6 +26,18 @@ public class BatteryManager extends Application {
 	private VBox sideMenu; // Menú lateral
     private StackPane contentArea; // Área de contenido
     private boolean isMenuOpen = false; // Estado del menú lateral
+    
+    private SystemInfo systemInfo; 
+    private HardwareAbstractionLayer hal;
+    
+    // Elementos de la pantalla de batería
+    private Label batteryPercentage;
+    private Label batteryStatus;
+    private Label remainingTime;
+    private Label designCapacity;
+    private Label fullChargeCapacity;
+    private Label speedCharge;
+    private volatile boolean running = true;
 
     public static void main(String[] args) {
         launch(args);
@@ -67,15 +75,20 @@ public class BatteryManager extends Application {
         // Opciones del menú lateral
         Button homeButton = new Button("Home");
         Button historyButton = new Button("History");
-
         styleMenuButton(homeButton);
         styleMenuButton(historyButton);
 
         sideMenu.getChildren().addAll(homeButton, historyButton);
 
         // Acciones de los botones
-        homeButton.setOnAction(e -> showHome());
-        historyButton.setOnAction(e -> showHistory());
+        homeButton.setOnAction(e -> {
+            showHome();
+            toggleMenu();
+        });
+        historyButton.setOnAction(e -> {
+            showHistory();
+            toggleMenu();
+        });
 
         // Área de contenido
         contentArea = new StackPane();
@@ -98,20 +111,90 @@ public class BatteryManager extends Application {
         Scene scene = new Scene(mainLayout, 800, 600);
         primaryStage.setScene(scene);
         primaryStage.show();
+        
+        // Instanciar SystemInfo y HardwareAbstractionLayer 
+        systemInfo = new SystemInfo(); 
+        hal = systemInfo.getHardware();
+        
+        // Iniciar el hilo de actualización de batería
+        startBatteryInfoUpdater();
+
+        // Detener el hilo al cerrar la ventana
+        primaryStage.setOnCloseRequest(event -> running = false);
     }
     
     // Método para mostrar u ocultar el menú lateral
     private void toggleMenu() {
         isMenuOpen = !isMenuOpen;
         sideMenu.setVisible(isMenuOpen);
+        sideMenu.setManaged(isMenuOpen);
     }
 
     // Método para mostrar la pantalla de Home
     private void showHome() {
         contentArea.getChildren().clear();
-        Label homeLabel = new Label("Welcome to Home!");
-        homeLabel.setStyle("-fx-font-size: 24; -fx-text-fill: #333333;");
-        contentArea.getChildren().add(homeLabel);
+        
+        // Lado derecho: Detalles técnicos
+        VBox rightColumn = new VBox(10);
+        rightColumn.setAlignment(Pos.TOP_CENTER);
+        rightColumn.setPadding(new Insets(10));
+        
+        // Crear etiquetas dinámicas
+        batteryPercentage = new Label("--%");
+        batteryStatus = new Label("Unknown");
+        remainingTime = new Label("--");
+        designCapacity = new Label("--");
+        fullChargeCapacity = new Label("--");
+        speedCharge = new Label("--");
+        
+        // Creación de etiquetas con iconos, texto y valor dentro de un rectángulo
+        rightColumn.getChildren().addAll(
+        		createDetailBox("🔋", "Porcentage", batteryPercentage),
+        		createDetailBox("⚡", "Power Status", batteryStatus),
+        		createDetailBox("⏳", "Remaining Time", remainingTime),
+        		createDetailBox("📊", "Design Capacity", designCapacity),
+        		createDetailBox("⚡", "Full Charge Capacity", fullChargeCapacity),
+                createDetailBox("⚡", "Speed", speedCharge)
+        );
+
+        // Contenedor principal para dividir en dos columnas
+        HBox mainLayout = new HBox(20, rightColumn);
+        mainLayout.setAlignment(Pos.CENTER);
+
+        contentArea.getChildren().add(mainLayout);
+    }
+    
+    // Método para crear cada detalle con icono, texto y valor dentro de un rectángulo
+    private HBox createDetailBox(String icon, String label, Label valueLabel) {
+    	// Icono
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("Arial", 14));
+        iconLabel.setStyle("-fx-text-fill: white;");
+    	
+    	// Etiqueta del texto
+        Label labelText = new Label(label + " ");
+        labelText.setFont(Font.font("Arial", 14));
+        labelText.setStyle("-fx-text-fill: white;");
+
+        // Etiqueta del valor
+        valueLabel.setFont(Font.font("Arial", 14));
+        valueLabel.setStyle("-fx-text-fill: white;");
+        
+        // Contenedor para el texto y el icono (parte izquierda del rectángulo)
+        HBox detailBox = new HBox(10, iconLabel, labelText);
+        detailBox.setStyle("-fx-background-color: #4CAF50; -fx-padding: 10; -fx-border-radius: 5;");
+        
+        // Contenedor para el valor alineado a la derecha (parte derecha del rectángulo)
+        HBox rightBox = new HBox(valueLabel);
+        rightBox.setStyle("-fx-background-color: #4CAF50;"); // Aseguramos que el valor también tenga fondo verde
+        rightBox.setAlignment(Pos.CENTER_RIGHT); // Alineación a la derecha para el valor
+        HBox.setHgrow(rightBox, Priority.ALWAYS); // El valor ocupará el espacio disponible en la fila
+        
+        // Contenedor final con los detalles y el valor a la derecha
+        HBox fullDetailBox = new HBox(10, detailBox, rightBox);
+        fullDetailBox.setStyle("-fx-background-color: #4CAF50; -fx-padding: 10; -fx-border-radius: 5;");
+
+        return fullDetailBox;
     }
 
     // Método para mostrar la pantalla de History
@@ -120,73 +203,6 @@ public class BatteryManager extends Application {
         Label historyLabel = new Label("Battery History");
         historyLabel.setStyle("-fx-font-size: 24; -fx-text-fill: #333333;");
         contentArea.getChildren().add(historyLabel);
-    }
-
-    // Estilizar los botones del menú lateral
-    private void styleMenuButton(Button button) {
-        button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #555555;");
-        button.setPrefWidth(Double.MAX_VALUE);
-        button.setAlignment(Pos.CENTER_LEFT);
-        button.setPadding(new Insets(10));
-        button.setOnMouseEntered(e -> button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #666666;"));
-        button.setOnMouseExited(e -> button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #555555;"));
-    }
-	
-	/*private Label batteryPercentageLabel;
-    private Label batteryStatusLabel;
-    private ProgressBar batteryProgressBar;
-    private Circle powerIndicator;
-    private volatile boolean running = true;
-    private SystemInfo systemInfo; 
-    private HardwareAbstractionLayer hal;
-    
-    public static void main(String[] args) {
-        launch(args);
-    }
-
-    @Override
-    public void start(Stage primaryStage) {
-        primaryStage.setTitle("Battery Manager");
-        
-        // Etiqueta para el porcentaje de batería
-        batteryPercentageLabel = new Label("Battery Percentage: --%");
-        batteryPercentageLabel.setFont(Font.font("Arial", 20));
-        batteryPercentageLabel.setTextFill(Color.DARKGREEN);
-        
-        // Barra de progreso para mostrar el nivel de la batería
-        batteryProgressBar = new ProgressBar(0);
-        batteryProgressBar.setPrefWidth(250);
-        
-        // Etiqueta para el estado de la batería
-        batteryStatusLabel = new Label("Battery Status: Unknown");
-        batteryStatusLabel.setFont(Font.font("Arial", 14));
-        batteryStatusLabel.setTextFill(Color.DARKBLUE);
-        
-        // Indicadora de estado
-        powerIndicator = new Circle(10);
-        powerIndicator.setFill(Color.GRAY);        
-        
-        // Contenedor principal
-        VBox layout = new VBox(15);
-        layout.setPadding(new Insets(20));
-        layout.setAlignment(Pos.CENTER);
-        layout.setStyle("-fx-background-color: #f0f0f0;");
-        layout.getChildren().addAll(batteryPercentageLabel, batteryProgressBar, batteryStatusLabel, powerIndicator);
-        
-        // Escena
-        Scene scene = new Scene(layout, 400, 300);
-        primaryStage.setScene(scene);
-        primaryStage.show();
-        
-        // Instanciar SystemInfo y HardwareAbstractionLayer 
-        systemInfo = new SystemInfo(); 
-        hal = systemInfo.getHardware();
-
-        // Iniciar el hilo para actualizar la información de la batería
-        startBatteryInfoUpdater();
-
-        // Detener el hilo al cerrar la ventana
-        primaryStage.setOnCloseRequest(event -> stopUpdaterThread());
     }
     
     private void startBatteryInfoUpdater() {
@@ -209,64 +225,66 @@ public class BatteryManager extends Application {
         updaterThread.start();
     }
     
-    private void stopUpdaterThread() {
-        running = false;
-    }
-    
     private void updateBatteryInfo() {
         List<PowerSource> powerSources = hal.getPowerSources();
         if (powerSources.isEmpty()) {
             Platform.runLater(() -> {
-                batteryPercentageLabel.setText("Battery Percentage: No battery found");
-                batteryProgressBar.setProgress(0);
-                batteryStatusLabel.setText("Battery Status: Not available");
-                batteryProgressBar.setStyle("-fx-accent: gray;");
-                powerIndicator.setFill(Color.GRAY);
+                batteryPercentage.setText("Battery Percentage: No battery found");
+                batteryStatus.setText("Battery Status: Not available");
+                remainingTime.setText("Unknown");
+                designCapacity.setText("Unknown");
+                fullChargeCapacity.setText("Unknown");
+                speedCharge.setText("Unknown");
             });
         } else {
             PowerSource powerSource = powerSources.get(0);
+            
+            // Obtener capacidad restante y máxima
             double currentCapacity = powerSource.getCurrentCapacity();
             double maxCapacity = powerSource.getMaxCapacity();
+            double designCapacityValue = powerSource.getDesignCapacity();
+            double power = powerSource.getPowerUsageRate();
+            String powerStatus = powerSource.isCharging() ? "Charging" : "On Battery Power";
+            
+            // Calcular tiempo restante (si es aplicable)
+            double timeRemaining = powerSource.getTimeRemainingInstant();
+            String remainingTimeText = (timeRemaining >= 0)
+                    ? String.format("%d min", (int) (timeRemaining / 60))
+                    : "Unknown";
             
             // Validar que currentCapacity y maxCapacity
             if (currentCapacity > 0 && maxCapacity > 0) {
             	double remainingCapacity = (currentCapacity / maxCapacity) * 100;
 
                 Platform.runLater(() -> {
-                	batteryPercentageLabel.setText("Battery Percentage: " + String.format("%.0f", remainingCapacity) + "%");
-                	batteryProgressBar.setProgress(remainingCapacity / 100);
-                	//batteryStatusLabel.setText("Battery Status: " + (powerSource.isCharging() ? "Charging" : "Not Charging"));
-                
-                	// Cambiar el color de la barra de progreso según el nivel de batería
-                    if (remainingCapacity > 0.5) {
-                        batteryProgressBar.setStyle("-fx-accent: green;");
-                    } else if (remainingCapacity > 0.2) {
-                        batteryProgressBar.setStyle("-fx-accent: orange;");
-                    } else {
-                        batteryProgressBar.setStyle("-fx-accent: red;");
-                    }
-                    
-                    // Actualizar luz según capacidad y estado
-                    if (powerSource.isCharging()) {
-                        powerIndicator.setFill(Color.YELLOW);
-                        batteryStatusLabel.setText("Battery Status: Charging");
-                    } else if (powerSource.isDischarging()) {
-                        powerIndicator.setFill(remainingCapacity > 20 ? Color.ORANGE : Color.RED);
-                        batteryStatusLabel.setText("Battery Status: On Battery Power");
-                    } else {
-                        powerIndicator.setFill(Color.BLUE);
-                        batteryStatusLabel.setText("Battery Status: Connected but Not Charging");
-                    }
+                	batteryPercentage.setText(String.format("%.0f", remainingCapacity) + "%");
+                    batteryStatus.setText(powerSource.isCharging() ? "Charging" : "On Battery Power");
+                    remainingTime.setText(remainingTimeText);
+                    designCapacity.setText(String.format("%.0f Wh", designCapacityValue));
+                    fullChargeCapacity.setText(String.format("%.0f Wh", maxCapacity));
+                    speedCharge.setText(String.format("%.2f W", power));
                 });
 			} else {
 				Platform.runLater(() -> { 
-					batteryPercentageLabel.setText("Battery Percentage: Invalid data");
-					batteryProgressBar.setProgress(0);
-					batteryStatusLabel.setText("Battery Status: Not available");
-					batteryProgressBar.setStyle("-fx-accent: gray;");
-					powerIndicator.setFill(Color.GRAY);
+					batteryPercentage.setText("Battery Percentage: Invalid data");
+					batteryStatus.setText("Battery Status: Not available");
+					remainingTime.setText("Unknown"); 
+					designCapacity.setText("Unknown"); 
+					fullChargeCapacity.setText("Unknown"); 
+					speedCharge.setText("Unknown");
 				});
 			}
         }
-    }*/
+    }
+    
+    // Estilizar los botones del menú lateral
+    private void styleMenuButton(Button button) {
+        button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #555555;");
+        button.setPrefWidth(Double.MAX_VALUE);
+        button.setAlignment(Pos.CENTER_LEFT);
+        button.setPadding(new Insets(10));
+        button.setOnMouseEntered(e -> button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #666666;"));
+        button.setOnMouseExited(e -> button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #555555;"));
+    }
+	
 }
