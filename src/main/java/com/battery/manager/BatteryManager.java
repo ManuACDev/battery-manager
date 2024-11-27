@@ -9,13 +9,20 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.Slider;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import oshi.SystemInfo;
 import oshi.hardware.HardwareAbstractionLayer;
@@ -32,6 +39,7 @@ public class BatteryManager extends Application {
     
     // Elementos de la pantalla de batería
     private Label batteryPercentage;
+    private Label percentageCircle;
     private Label batteryStatus;
     private Label remainingTime;
     private Label designCapacity;
@@ -108,7 +116,7 @@ public class BatteryManager extends Application {
         sideMenu.setVisible(false);
 
         // Escena principal
-        Scene scene = new Scene(mainLayout, 800, 600);
+        Scene scene = new Scene(mainLayout, 900, 550);
         primaryStage.setScene(scene);
         primaryStage.show();
         
@@ -127,25 +135,84 @@ public class BatteryManager extends Application {
     private void toggleMenu() {
         isMenuOpen = !isMenuOpen;
         sideMenu.setVisible(isMenuOpen);
-        sideMenu.setManaged(isMenuOpen);
     }
 
     // Método para mostrar la pantalla de Home
     private void showHome() {
         contentArea.getChildren().clear();
         
-        // Lado derecho: Detalles técnicos
-        VBox rightColumn = new VBox(10);
-        rightColumn.setAlignment(Pos.TOP_CENTER);
-        rightColumn.setPadding(new Insets(10));
-        
         // Crear etiquetas dinámicas
         batteryPercentage = new Label("--%");
+        percentageCircle = new Label("--%");
         batteryStatus = new Label("Unknown");
         remainingTime = new Label("--");
         designCapacity = new Label("--");
         fullChargeCapacity = new Label("--");
         speedCharge = new Label("--");
+        
+        // Lado izquierdo: Figura de batería y configuraciones
+        VBox leftColumn = new VBox(20);
+        leftColumn.setAlignment(Pos.TOP_CENTER);
+        leftColumn.setPadding(new Insets(20));
+
+        // Crear el círculo que representará la batería 
+        Circle batteryCircle = new Circle(75); 
+        batteryCircle.setStroke(Color.DARKGREEN); 
+        batteryCircle.setStrokeWidth(5); 
+        batteryCircle.setFill(Color.TRANSPARENT);
+        
+        // Usar un StackPane para superponer el texto sobre el círculo 
+        StackPane batteryIndicator = new StackPane(); 
+        batteryIndicator.getChildren().addAll(batteryCircle, percentageCircle);
+        
+        // Toggle para notificaciones 
+        CheckBox notificationToggle = new CheckBox("Enable Notifications"); 
+        notificationToggle.setSelected(true); // Activado por defecto 
+        notificationToggle.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;");
+        
+        // Slider para porcentaje de desconexión 
+        Label disconnectLabel = new Label("Aviso para desconectar al:"); 
+        disconnectLabel.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
+        Slider disconnectSlider = new Slider(50, 100, 80); 
+        disconnectSlider.setShowTickLabels(true); 
+        disconnectSlider.setShowTickMarks(true); 
+        disconnectSlider.setMajorTickUnit(10); 
+        disconnectSlider.setStyle("-fx-accent: #4CAF50;");
+        
+        // Etiqueta de porcentaje seleccionado 
+        Label disconnectValue = new Label("80%"); 
+        disconnectValue.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
+        disconnectSlider.valueProperty().addListener((obs, oldVal, newVal) -> { 
+        	disconnectValue.setText(String.format("%.0f%%", newVal.doubleValue())); 
+        });
+        
+        VBox disconnectBox = new VBox(5, disconnectLabel, disconnectSlider, disconnectValue);
+        
+        // Slider para porcentaje de conexión 
+        Label connectLabel = new Label("Aviso para conectar al:"); 
+        connectLabel.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
+        Slider connectSlider = new Slider(0, 50, 20); // Min: 0%, Max: 50%, Valor inicial: 20% 
+        connectSlider.setShowTickLabels(true); 
+        connectSlider.setShowTickMarks(true); 
+        connectSlider.setMajorTickUnit(10); 
+        connectSlider.setStyle("-fx-accent: #4CAF50;");
+        
+        // Etiqueta de porcentaje seleccionado 
+        Label connectValue = new Label("20%"); 
+        connectValue.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
+        connectSlider.valueProperty().addListener((obs, oldVal, newVal) -> { 
+        	connectValue.setText(String.format("%.0f%%", newVal.doubleValue())); 
+        });
+        
+        VBox connectBox = new VBox(5, connectLabel, connectSlider, connectValue);
+        
+        // Agregar todos los elementos al lado izquierdo 
+        leftColumn.getChildren().addAll(batteryIndicator, notificationToggle, disconnectBox, connectBox);
+        
+        // Lado derecho: Detalles técnicos
+        VBox rightColumn = new VBox(10);
+        rightColumn.setAlignment(Pos.TOP_CENTER);
+        rightColumn.setPadding(new Insets(10));
         
         // Creación de etiquetas con iconos, texto y valor dentro de un rectángulo
         rightColumn.getChildren().addAll(
@@ -158,7 +225,7 @@ public class BatteryManager extends Application {
         );
 
         // Contenedor principal para dividir en dos columnas
-        HBox mainLayout = new HBox(20, rightColumn);
+        HBox mainLayout = new HBox(50, leftColumn, rightColumn);
         mainLayout.setAlignment(Pos.CENTER);
 
         contentArea.getChildren().add(mainLayout);
@@ -230,6 +297,7 @@ public class BatteryManager extends Application {
         if (powerSources.isEmpty()) {
             Platform.runLater(() -> {
                 batteryPercentage.setText("Battery Percentage: No battery found");
+                percentageCircle.setText("--%");
                 batteryStatus.setText("Battery Status: Not available");
                 remainingTime.setText("Unknown");
                 designCapacity.setText("Unknown");
@@ -258,6 +326,7 @@ public class BatteryManager extends Application {
 
                 Platform.runLater(() -> {
                 	batteryPercentage.setText(String.format("%.0f", remainingCapacity) + "%");
+                	percentageCircle.setText(String.format("%.0f", remainingCapacity) + "%");
                     batteryStatus.setText(powerSource.isCharging() ? "Charging" : "On Battery Power");
                     remainingTime.setText(remainingTimeText);
                     designCapacity.setText(String.format("%.0f Wh", designCapacityValue));
@@ -267,6 +336,7 @@ public class BatteryManager extends Application {
 			} else {
 				Platform.runLater(() -> { 
 					batteryPercentage.setText("Battery Percentage: Invalid data");
+					percentageCircle.setText("--%");
 					batteryStatus.setText("Battery Status: Not available");
 					remainingTime.setText("Unknown"); 
 					designCapacity.setText("Unknown"); 
