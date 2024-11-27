@@ -11,25 +11,131 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import oshi.SystemInfo;
-import oshi.hardware.ComputerSystem;
 import oshi.hardware.HardwareAbstractionLayer;
 import oshi.hardware.PowerSource;
-import oshi.software.os.OperatingSystem;
 
 public class BatteryManager extends Application {
 	
-	private Label batteryPercentageLabel;
+	private VBox sideMenu; // Menú lateral
+    private StackPane contentArea; // Área de contenido
+    private boolean isMenuOpen = false; // Estado del menú lateral
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+    
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Battery Manager");
+
+        // Barra superior
+        StackPane topBar = new StackPane();
+        topBar.setStyle("-fx-background-color: #4CAF50; -fx-padding: 10;");
+
+        // Botón de menú hamburguesa
+        Button menuButton = new Button("☰");
+        menuButton.setStyle("-fx-font-size: 18; -fx-background-color: transparent; -fx-text-fill: white;");
+        menuButton.setOnAction(e -> toggleMenu()); // Manejar apertura/cierre del menú lateral
+        StackPane.setAlignment(menuButton, Pos.CENTER_LEFT); // Alinear a la izquierda
+
+        // Título
+        Label titleLabel = new Label("Battery Manager");
+        titleLabel.setStyle("-fx-font-size: 20; -fx-text-fill: white;");
+        StackPane.setAlignment(titleLabel, Pos.CENTER); // Centrar título
+
+        // Agregar elementos al StackPane
+        topBar.getChildren().addAll(menuButton, titleLabel);
+
+        // Menú lateral
+        sideMenu = new VBox();
+        sideMenu.setStyle("-fx-background-color: #333333;");
+        sideMenu.setPadding(new Insets(20));
+        sideMenu.setSpacing(15);
+        sideMenu.setPrefWidth(200);
+
+        // Opciones del menú lateral
+        Button homeButton = new Button("Home");
+        Button historyButton = new Button("History");
+
+        styleMenuButton(homeButton);
+        styleMenuButton(historyButton);
+
+        sideMenu.getChildren().addAll(homeButton, historyButton);
+
+        // Acciones de los botones
+        homeButton.setOnAction(e -> showHome());
+        historyButton.setOnAction(e -> showHistory());
+
+        // Área de contenido
+        contentArea = new StackPane();
+        contentArea.setStyle("-fx-background-color: #f0f0f0;");
+        contentArea.setPadding(new Insets(20));
+
+        // Mostrar la pantalla inicial (Home)
+        showHome();
+
+        // Layout principal
+        BorderPane mainLayout = new BorderPane();
+        mainLayout.setTop(topBar);
+        mainLayout.setLeft(sideMenu);
+        mainLayout.setCenter(contentArea);
+
+        // Mostrar inicialmente el menú cerrado
+        sideMenu.setVisible(false);
+
+        // Escena principal
+        Scene scene = new Scene(mainLayout, 800, 600);
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+    
+    // Método para mostrar u ocultar el menú lateral
+    private void toggleMenu() {
+        isMenuOpen = !isMenuOpen;
+        sideMenu.setVisible(isMenuOpen);
+    }
+
+    // Método para mostrar la pantalla de Home
+    private void showHome() {
+        contentArea.getChildren().clear();
+        Label homeLabel = new Label("Welcome to Home!");
+        homeLabel.setStyle("-fx-font-size: 24; -fx-text-fill: #333333;");
+        contentArea.getChildren().add(homeLabel);
+    }
+
+    // Método para mostrar la pantalla de History
+    private void showHistory() {
+        contentArea.getChildren().clear();
+        Label historyLabel = new Label("Battery History");
+        historyLabel.setStyle("-fx-font-size: 24; -fx-text-fill: #333333;");
+        contentArea.getChildren().add(historyLabel);
+    }
+
+    // Estilizar los botones del menú lateral
+    private void styleMenuButton(Button button) {
+        button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #555555;");
+        button.setPrefWidth(Double.MAX_VALUE);
+        button.setAlignment(Pos.CENTER_LEFT);
+        button.setPadding(new Insets(10));
+        button.setOnMouseEntered(e -> button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #666666;"));
+        button.setOnMouseExited(e -> button.setStyle("-fx-font-size: 16; -fx-text-fill: white; -fx-background-color: #555555;"));
+    }
+	
+	/*private Label batteryPercentageLabel;
     private Label batteryStatusLabel;
     private ProgressBar batteryProgressBar;
     private Circle powerIndicator;
-    private Button toggleChargeButton;
-    private boolean useDirectPower = false;
     private volatile boolean running = true;
     private SystemInfo systemInfo; 
     private HardwareAbstractionLayer hal;
@@ -58,18 +164,14 @@ public class BatteryManager extends Application {
         
         // Indicadora de estado
         powerIndicator = new Circle(10);
-        powerIndicator.setFill(Color.GRAY);
-        
-        // Botón para alternar carga o corriente directa
-        toggleChargeButton = new Button("Use AC Power");
-        toggleChargeButton.setOnAction(event -> togglePowerMode());
+        powerIndicator.setFill(Color.GRAY);        
         
         // Contenedor principal
         VBox layout = new VBox(15);
         layout.setPadding(new Insets(20));
         layout.setAlignment(Pos.CENTER);
         layout.setStyle("-fx-background-color: #f0f0f0;");
-        layout.getChildren().addAll(batteryPercentageLabel, batteryProgressBar, batteryStatusLabel, powerIndicator, toggleChargeButton);
+        layout.getChildren().addAll(batteryPercentageLabel, batteryProgressBar, batteryStatusLabel, powerIndicator);
         
         // Escena
         Scene scene = new Scene(layout, 400, 300);
@@ -145,10 +247,7 @@ public class BatteryManager extends Application {
                     }
                     
                     // Actualizar luz según capacidad y estado
-                    if (useDirectPower) {
-                        powerIndicator.setFill(Color.GREEN);
-                        batteryStatusLabel.setText("Battery Status: Using AC Power (Direct)");
-                    } else if (powerSource.isCharging()) {
+                    if (powerSource.isCharging()) {
                         powerIndicator.setFill(Color.YELLOW);
                         batteryStatusLabel.setText("Battery Status: Charging");
                     } else if (powerSource.isDischarging()) {
@@ -169,21 +268,5 @@ public class BatteryManager extends Application {
 				});
 			}
         }
-    }
-    
-    private void togglePowerMode() {
-        useDirectPower = !useDirectPower;
-        Platform.runLater(() -> {
-            if (useDirectPower) {
-                toggleChargeButton.setText("Charge Battery");
-                powerIndicator.setFill(Color.GREEN); // Indica corriente directa
-                batteryStatusLabel.setText("Battery Status: Using AC Power");
-            } else {
-                toggleChargeButton.setText("Use AC Power");
-                powerIndicator.setFill(Color.YELLOW); // Indica carga
-                batteryStatusLabel.setText("Battery Status: Charging Battery");
-            }
-        });
-    }
-
+    }*/
 }
