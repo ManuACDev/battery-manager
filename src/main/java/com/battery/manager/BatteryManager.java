@@ -260,6 +260,8 @@ public class BatteryManager extends Application {
     			hasNotifiedLowBattery = false; // Restablece la otra notificación
 			} else if (!isCharging && batteryLevel < threshold) {
 				hasNotifiedHighBattery = false; // Restablece la notificación si se desconecta antes de alcanzar el umbral
+			} else if (isCharging && batteryLevel < threshold) { 
+				hasNotifiedHighBattery = false; // Restablece la notificación si el umbral se ajusta hacia arriba
 			}
         } else {
         	if (!isCharging && batteryLevel <= threshold && !hasNotifiedLowBattery) {
@@ -268,6 +270,8 @@ public class BatteryManager extends Application {
         		hasNotifiedHighBattery = false; // Restablece la otra notificación
         	} else if (isCharging && batteryLevel > threshold) {
         		hasNotifiedLowBattery = false; // Restablece la notificación si se conecta antes de alcanzar el umbral
+        	} else if (!isCharging && batteryLevel > threshold) { 
+        		hasNotifiedLowBattery = false; // Restablece la notificación si el umbral se ajusta hacia abajo
         	}
         }
     }
