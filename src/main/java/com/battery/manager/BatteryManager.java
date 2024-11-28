@@ -10,6 +10,7 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
@@ -45,7 +46,13 @@ public class BatteryManager extends Application {
     private Label fullChargeCapacity;
     private Label speedCharge;
     private DoubleProperty batteryPercentageNumeric = new SimpleDoubleProperty();
+    private boolean isCharging = false;
     private volatile boolean running = true;
+    private Slider disconnectSlider;
+    private Slider connectSlider;
+    
+    private boolean hasNotifiedLowBattery = false; 
+    private boolean hasNotifiedHighBattery = false;
 
     public static void main(String[] args) {
         launch(args);
@@ -168,7 +175,7 @@ public class BatteryManager extends Application {
         StackPane batteryIndicator = new StackPane(); 
         batteryIndicator.getChildren().addAll(innerCircle, batteryCircle, percentageCircle);
         
-        // Toggle para notificaciones 
+        // Checkbox para notificaciones 
         CheckBox notificationToggle = new CheckBox("Enable Notifications"); 
         notificationToggle.setSelected(true); // Activado por defecto 
         notificationToggle.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;");
@@ -176,7 +183,8 @@ public class BatteryManager extends Application {
         // Slider para porcentaje de desconexión 
         Label disconnectLabel = new Label("Aviso para desconectar al:"); 
         disconnectLabel.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
-        Slider disconnectSlider = new Slider(50, 100, 80); 
+        
+        disconnectSlider = new Slider(50, 100, 80); 
         disconnectSlider.setShowTickLabels(true); 
         disconnectSlider.setShowTickMarks(true); 
         disconnectSlider.setMajorTickUnit(10); 
@@ -187,6 +195,9 @@ public class BatteryManager extends Application {
         disconnectValue.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
         disconnectSlider.valueProperty().addListener((obs, oldVal, newVal) -> { 
         	disconnectValue.setText(String.format("%.0f%%", newVal.doubleValue())); 
+        	if (notificationToggle.isSelected()) {
+        		checkAndSendNotification(newVal.doubleValue(), true);
+            }
         });
         
         VBox disconnectBox = new VBox(5, disconnectLabel, disconnectSlider, disconnectValue);
@@ -194,7 +205,8 @@ public class BatteryManager extends Application {
         // Slider para porcentaje de conexión 
         Label connectLabel = new Label("Aviso para conectar al:"); 
         connectLabel.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
-        Slider connectSlider = new Slider(0, 50, 20); // Min: 0%, Max: 50%, Valor inicial: 20% 
+        
+        connectSlider = new Slider(0, 50, 20); // Min: 0%, Max: 50%, Valor inicial: 20% 
         connectSlider.setShowTickLabels(true); 
         connectSlider.setShowTickMarks(true); 
         connectSlider.setMajorTickUnit(10); 
@@ -205,6 +217,9 @@ public class BatteryManager extends Application {
         connectValue.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
         connectSlider.valueProperty().addListener((obs, oldVal, newVal) -> { 
         	connectValue.setText(String.format("%.0f%%", newVal.doubleValue())); 
+        	if (notificationToggle.isSelected()) {
+        		checkAndSendNotification(newVal.doubleValue(), false);
+            }
         });
         
         VBox connectBox = new VBox(5, connectLabel, connectSlider, connectValue);
@@ -220,11 +235,11 @@ public class BatteryManager extends Application {
         // Creación de etiquetas con iconos, texto y valor dentro de un rectángulo
         rightColumn.getChildren().addAll(
         		createDetailBox("🔋", "Porcentage", batteryPercentage),
-        		createDetailBox("⚡", "Power Status", batteryStatus),
+        		createDetailBox("🔌", "Power Status", batteryStatus),
         		createDetailBox("⏳", "Remaining Time", remainingTime),
         		createDetailBox("📊", "Design Capacity", designCapacity),
         		createDetailBox("⚡", "Full Charge Capacity", fullChargeCapacity),
-                createDetailBox("⚡", "Speed", speedCharge)
+                createDetailBox("🚀", "Speed", speedCharge)
         );
 
         // Contenedor principal para dividir en dos columnas
@@ -232,6 +247,36 @@ public class BatteryManager extends Application {
         mainLayout.setAlignment(Pos.CENTER);
 
         contentArea.getChildren().add(mainLayout);
+    }
+    
+    // Métodos para gestionar notificaciones
+    private void checkAndSendNotification(Double threshold, Boolean disconnect) {
+    	double batteryLevel = batteryPercentageNumeric.get();
+    	 
+    	if (disconnect) {
+    		if (isCharging && batteryLevel >= threshold && !hasNotifiedHighBattery) {
+    			showNotification("Aviso", "Nivel de batería suficiente. Puedes desconectar.");
+    			hasNotifiedHighBattery = true; // Marca que se ha enviado la notificación 
+    			hasNotifiedLowBattery = false; // Restablece la otra notificación
+			} else if (!isCharging && batteryLevel < threshold) {
+				hasNotifiedHighBattery = false; // Restablece la notificación si se desconecta antes de alcanzar el umbral
+			}
+        } else {
+        	if (!isCharging && batteryLevel <= threshold && !hasNotifiedLowBattery) {
+        		showNotification("Aviso", "Nivel de batería bajo. Conecta el dispositivo.");
+        		hasNotifiedLowBattery = true; // Marca que se ha enviado la notificación 
+        		hasNotifiedHighBattery = false; // Restablece la otra notificación
+        	} else if (isCharging && batteryLevel > threshold) {
+        		hasNotifiedLowBattery = false; // Restablece la notificación si se conecta antes de alcanzar el umbral
+        	}
+        }
+    }
+
+    private void showNotification(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setContentText(message);
+        alert.show();
     }
     
     // Método para crear cada detalle con icono, texto y valor dentro de un rectángulo
@@ -281,7 +326,7 @@ public class BatteryManager extends Application {
                 try {
                     // Actualizar información de la batería
                     updateBatteryInfo();
-
+                    
                     // Pausar el hilo por 5 segundos
                     Thread.sleep(5000);
                 } catch (InterruptedException e) {
@@ -302,6 +347,7 @@ public class BatteryManager extends Application {
                 batteryPercentage.setText("Battery Percentage: No battery found");
                 percentageCircle.setText("--%");
                 batteryPercentageNumeric.set(0);
+                isCharging = false;
                 batteryStatus.setText("Battery Status: Not available");
                 remainingTime.setText("Unknown");
                 designCapacity.setText("Unknown");
@@ -332,16 +378,25 @@ public class BatteryManager extends Application {
                 	percentageCircle.setText(String.format("%.0f", remainingCapacity) + "%");
                 	batteryPercentageNumeric.set(remainingCapacity);
                     batteryStatus.setText(powerSource.isCharging() ? "Charging" : "On Battery Power");
+                    isCharging = powerSource.isCharging();
                     remainingTime.setText(remainingTimeText);
                     designCapacity.setText(String.format("%.0f Wh", designCapacityValue));
                     fullChargeCapacity.setText(String.format("%.0f Wh", maxCapacity));
                     speedCharge.setText(String.format("%.2f W", power));
+                });
+                
+                Platform.runLater(() -> {
+                    if (disconnectSlider != null && connectSlider != null) {
+                        checkAndSendNotification(disconnectSlider.getValue(), true);
+                        checkAndSendNotification(connectSlider.getValue(), false);
+                    }
                 });
 			} else {
 				Platform.runLater(() -> { 
 					batteryPercentage.setText("Battery Percentage: Invalid data");
 					percentageCircle.setText("--%");
 					batteryPercentageNumeric.set(0);
+					isCharging = false;
 					batteryStatus.setText("Battery Status: Not available");
 					remainingTime.setText("Unknown"); 
 					designCapacity.setText("Unknown"); 
