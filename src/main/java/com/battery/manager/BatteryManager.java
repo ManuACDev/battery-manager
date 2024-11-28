@@ -4,6 +4,8 @@ package com.battery.manager;
 import java.util.List;
 
 import javafx.application.Application;
+import javafx.beans.property.DoubleProperty; 
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -11,9 +13,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
 import javafx.scene.control.Slider;
-import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -22,7 +22,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
-import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import oshi.SystemInfo;
 import oshi.hardware.HardwareAbstractionLayer;
@@ -45,6 +44,7 @@ public class BatteryManager extends Application {
     private Label designCapacity;
     private Label fullChargeCapacity;
     private Label speedCharge;
+    private DoubleProperty batteryPercentageNumeric = new SimpleDoubleProperty();
     private volatile boolean running = true;
 
     public static void main(String[] args) {
@@ -75,7 +75,7 @@ public class BatteryManager extends Application {
 
         // Menú lateral
         sideMenu = new VBox();
-        sideMenu.setStyle("-fx-background-color: #333333;");
+        sideMenu.setStyle("-fx-background-color: #333333; -fx-text-fill: white;");
         sideMenu.setPadding(new Insets(20));
         sideMenu.setSpacing(15);
         sideMenu.setPrefWidth(200);
@@ -89,14 +89,8 @@ public class BatteryManager extends Application {
         sideMenu.getChildren().addAll(homeButton, historyButton);
 
         // Acciones de los botones
-        homeButton.setOnAction(e -> {
-            showHome();
-            toggleMenu();
-        });
-        historyButton.setOnAction(e -> {
-            showHistory();
-            toggleMenu();
-        });
+        homeButton.setOnAction(e -> { showHome(); });
+        historyButton.setOnAction(e -> { showHistory(); });
 
         // Área de contenido
         contentArea = new StackPane();
@@ -111,9 +105,10 @@ public class BatteryManager extends Application {
         mainLayout.setTop(topBar);
         mainLayout.setLeft(sideMenu);
         mainLayout.setCenter(contentArea);
+        mainLayout.setStyle("-fx-background-color: #f0f0f0;");
 
         // Mostrar inicialmente el menú cerrado
-        sideMenu.setVisible(false);
+        sideMenu.setVisible(true);
 
         // Escena principal
         Scene scene = new Scene(mainLayout, 900, 550);
@@ -144,6 +139,7 @@ public class BatteryManager extends Application {
         // Crear etiquetas dinámicas
         batteryPercentage = new Label("--%");
         percentageCircle = new Label("--%");
+        percentageCircle.setStyle("-fx-font-size: 25; -fx-text-fill: darkgreen;");
         batteryStatus = new Label("Unknown");
         remainingTime = new Label("--");
         designCapacity = new Label("--");
@@ -161,9 +157,16 @@ public class BatteryManager extends Application {
         batteryCircle.setStrokeWidth(5); 
         batteryCircle.setFill(Color.TRANSPARENT);
         
+        // Crear el círculo interior que crecerá según el porcentaje de batería 
+        Circle innerCircle = new Circle(0); 
+        innerCircle.setFill(Color.LIGHTGREEN); 
+        
+        // Vincular el radio del círculo interior con el porcentaje de batería 
+        innerCircle.radiusProperty().bind(batteryPercentageNumeric.multiply(0.75));
+        
         // Usar un StackPane para superponer el texto sobre el círculo 
         StackPane batteryIndicator = new StackPane(); 
-        batteryIndicator.getChildren().addAll(batteryCircle, percentageCircle);
+        batteryIndicator.getChildren().addAll(innerCircle, batteryCircle, percentageCircle);
         
         // Toggle para notificaciones 
         CheckBox notificationToggle = new CheckBox("Enable Notifications"); 
@@ -298,6 +301,7 @@ public class BatteryManager extends Application {
             Platform.runLater(() -> {
                 batteryPercentage.setText("Battery Percentage: No battery found");
                 percentageCircle.setText("--%");
+                batteryPercentageNumeric.set(0);
                 batteryStatus.setText("Battery Status: Not available");
                 remainingTime.setText("Unknown");
                 designCapacity.setText("Unknown");
@@ -312,7 +316,6 @@ public class BatteryManager extends Application {
             double maxCapacity = powerSource.getMaxCapacity();
             double designCapacityValue = powerSource.getDesignCapacity();
             double power = powerSource.getPowerUsageRate();
-            String powerStatus = powerSource.isCharging() ? "Charging" : "On Battery Power";
             
             // Calcular tiempo restante (si es aplicable)
             double timeRemaining = powerSource.getTimeRemainingInstant();
@@ -327,6 +330,7 @@ public class BatteryManager extends Application {
                 Platform.runLater(() -> {
                 	batteryPercentage.setText(String.format("%.0f", remainingCapacity) + "%");
                 	percentageCircle.setText(String.format("%.0f", remainingCapacity) + "%");
+                	batteryPercentageNumeric.set(remainingCapacity);
                     batteryStatus.setText(powerSource.isCharging() ? "Charging" : "On Battery Power");
                     remainingTime.setText(remainingTimeText);
                     designCapacity.setText(String.format("%.0f Wh", designCapacityValue));
@@ -337,6 +341,7 @@ public class BatteryManager extends Application {
 				Platform.runLater(() -> { 
 					batteryPercentage.setText("Battery Percentage: Invalid data");
 					percentageCircle.setText("--%");
+					batteryPercentageNumeric.set(0);
 					batteryStatus.setText("Battery Status: Not available");
 					remainingTime.setText("Unknown"); 
 					designCapacity.setText("Unknown"); 
