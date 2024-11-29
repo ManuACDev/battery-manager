@@ -88,8 +88,8 @@ public class BatteryManager extends Application {
         sideMenu.setPrefWidth(200);
 
         // Opciones del menú lateral
-        Button homeButton = new Button("Home");
-        Button historyButton = new Button("History");
+        Button homeButton = new Button("🏠  Home");
+        Button historyButton = new Button("🔍  History");
         styleMenuButton(homeButton);
         styleMenuButton(historyButton);
 
