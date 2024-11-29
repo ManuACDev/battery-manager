@@ -10,12 +10,18 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
@@ -319,9 +325,74 @@ public class BatteryManager extends Application {
     // Método para mostrar la pantalla de History
     private void showHistory() {
         contentArea.getChildren().clear();
-        Label historyLabel = new Label("Battery History");
-        historyLabel.setStyle("-fx-font-size: 24; -fx-text-fill: #333333;");
-        contentArea.getChildren().add(historyLabel);
+        
+        // Crear el rectángulo izquierdo con detalles de batería 
+        VBox leftBox = new VBox(5); 
+        leftBox.setPadding(new Insets(10)); 
+        leftBox.setAlignment(Pos.TOP_CENTER); 
+        
+        // Crear etiquetas de porcentaje para cada registro 
+        Label percentageLabel1 = new Label("85%"); 
+        Label percentageLabel2 = new Label("80%"); 
+        Label percentageLabel3 = new Label("78%");
+        
+        // Añadir varios registros de batería (detalles) 
+        leftBox.getChildren().addAll( 
+        		createRegisterBox("🔌", "2024-11-29", percentageLabel1, "12:39"),
+        		createRegisterBox("🔌", "2024-11-29", percentageLabel2, "12:39"),
+        		createRegisterBox("🔌", "2024-11-29", percentageLabel3, "12:39")
+        );
+        
+        // Crear la gráfica de registro de batería 
+        NumberAxis xAxis = new NumberAxis(); 
+        NumberAxis yAxis = new NumberAxis(); 
+        LineChart<Number, Number> batteryChart = new LineChart<>(xAxis, yAxis); 
+        batteryChart.setTitle("Registro de Batería");
+        
+        // Añadir datos ficticios a la gráfica 
+        XYChart.Series<Number, Number> series = new XYChart.Series<>(); 
+        series.getData().add(new XYChart.Data<>(1, Integer.parseInt(percentageLabel1.getText().replace("%", "")))); 
+        series.getData().add(new XYChart.Data<>(2, Integer.parseInt(percentageLabel2.getText().replace("%", "")))); 
+        series.getData().add(new XYChart.Data<>(3, Integer.parseInt(percentageLabel3.getText().replace("%", ""))));
+        batteryChart.getData().add(series);
+        
+        // Crear el contenedor principal y añadir las dos mitades 
+        HBox mainBox = new HBox(20); 
+        mainBox.getChildren().addAll(leftBox, batteryChart);
+        
+        // Añadir el contenedor principal al área de contenido
+        contentArea.getChildren().add(mainBox);
+    }
+    
+    // Método para crear cada detalle con icono, fecha, porcentaje y valor dentro de un rectángulo
+    private HBox createRegisterBox(String icon, String date, Label valueLabel, String time) {
+    	// Icono
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font("Arial", 14));
+        iconLabel.setStyle("-fx-text-fill: white;");
+    	
+    	// Etiqueta del texto
+        Label labelDate = new Label(date);
+        labelDate.setFont(Font.font("Arial", 14));
+        labelDate.setStyle("-fx-text-fill: white;");
+
+        // Etiqueta del valor
+        valueLabel.setFont(Font.font("Arial", 14));
+        valueLabel.setStyle("-fx-text-fill: white;");
+        
+        // Etiqueta del texto
+        Label labelTime = new Label(time);
+        labelTime.setFont(Font.font("Arial", 14));
+        labelTime.setStyle("-fx-text-fill: white;");
+        
+        // Contenedor para el icono, fecha, porcentaje y tiempo (en una fila horizontal)
+        HBox detailBox = new HBox(10, iconLabel, labelDate, valueLabel, labelTime);
+        detailBox.setStyle("-fx-background-color: #4CAF50; -fx-padding: 10; -fx-border-radius: 5;");
+        detailBox.setAlignment(Pos.CENTER);
+        detailBox.setMinWidth(220);
+        detailBox.setMaxWidth(220);
+
+        return detailBox;
     }
     
     private void startBatteryInfoUpdater() {
