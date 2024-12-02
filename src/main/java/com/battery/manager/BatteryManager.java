@@ -62,6 +62,7 @@ public class BatteryManager extends Application {
     private boolean hasNotifiedHighBattery = false;
     
     private List<RegisterEntry> registerEntries = new ArrayList<>();
+    private boolean isFirstUpdate = true;
 
     public static void main(String[] args) {
         launch(args);
@@ -508,6 +509,12 @@ public class BatteryManager extends Application {
 
         String percentage = String.format("%.0f%%", currentBatteryLevel); 
         String icon = "🔌";
+        
+        if (isFirstUpdate) {
+        	isCharging = isCurrentlyCharging; // Inicializar el estado de carga actual 
+        	isFirstUpdate = false; 
+        	return;
+		}
 
         if ((isCurrentlyCharging && !isCharging) || (!isCurrentlyCharging && isCharging)) { 
             // Cambió el estado de carga 
