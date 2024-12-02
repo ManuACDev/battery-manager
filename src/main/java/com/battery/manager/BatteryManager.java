@@ -1,6 +1,9 @@
 package com.battery.manager;
 
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 import javafx.application.Application;
@@ -10,6 +13,7 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.chart.CategoryAxis;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -18,10 +22,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
@@ -59,6 +60,8 @@ public class BatteryManager extends Application {
     
     private boolean hasNotifiedLowBattery = false; 
     private boolean hasNotifiedHighBattery = false;
+    
+    private List<RegisterEntry> registerEntries = new ArrayList<>();
 
     public static void main(String[] args) {
         launch(args);
@@ -187,7 +190,7 @@ public class BatteryManager extends Application {
         notificationToggle.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;");
         
         // Slider para porcentaje de desconexión 
-        Label disconnectLabel = new Label("Aviso para desconectar al:"); 
+        Label disconnectLabel = new Label("Warning to disconnect at:"); 
         disconnectLabel.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
         
         disconnectSlider = new Slider(50, 100, 80); 
@@ -209,7 +212,7 @@ public class BatteryManager extends Application {
         VBox disconnectBox = new VBox(5, disconnectLabel, disconnectSlider, disconnectValue);
         
         // Slider para porcentaje de conexión 
-        Label connectLabel = new Label("Aviso para conectar al:"); 
+        Label connectLabel = new Label("Warning to connect at:"); 
         connectLabel.setStyle("-fx-font-size: 14; -fx-text-fill: #333333;"); 
         
         connectSlider = new Slider(0, 50, 20); // Min: 0%, Max: 50%, Valor inicial: 20% 
@@ -240,7 +243,7 @@ public class BatteryManager extends Application {
         
         // Creación de etiquetas con iconos, texto y valor dentro de un rectángulo
         rightColumn.getChildren().addAll(
-        		createDetailBox("🔋", "Porcentage", batteryPercentage),
+        		createDetailBox("🔋", "Percentage", batteryPercentage),
         		createDetailBox("🔌", "Power Status", batteryStatus),
         		createDetailBox("⏳", "Remaining Time", remainingTime),
         		createDetailBox("📊", "Design Capacity", designCapacity),
@@ -331,29 +334,41 @@ public class BatteryManager extends Application {
         leftBox.setPadding(new Insets(10)); 
         leftBox.setAlignment(Pos.TOP_CENTER); 
         
-        // Crear etiquetas de porcentaje para cada registro 
-        Label percentageLabel1 = new Label("85%"); 
-        Label percentageLabel2 = new Label("80%"); 
-        Label percentageLabel3 = new Label("78%");
+        // Añadir registros de la lista a la interfaz 
+        if (registerEntries.isEmpty()) { // Mostrar mensaje si no hay registros 
+        	Label noRecordsLabel = new Label("No battery records available"); 
+        	noRecordsLabel.setFont(Font.font("Arial", 14)); 
+        	noRecordsLabel.setStyle("-fx-text-fill: #4CAF50;"); 
+        	noRecordsLabel.setMinWidth(180);
+        	leftBox.getChildren().add(noRecordsLabel); 
+        } else {
+        	for (RegisterEntry entry : registerEntries) { 
+            	Label percentageLabel = new Label(entry.getPercentage()); 
+            	leftBox.getChildren().add(createRegisterBox(entry.getIcon(), entry.getDate(), percentageLabel, entry.getTime())); 
+            }
+        }
         
-        // Añadir varios registros de batería (detalles) 
-        leftBox.getChildren().addAll( 
-        		createRegisterBox("🔌", "2024-11-29", percentageLabel1, "12:39"),
-        		createRegisterBox("🔌", "2024-11-29", percentageLabel2, "12:39"),
-        		createRegisterBox("🔌", "2024-11-29", percentageLabel3, "12:39")
-        );
+        // Crear el eje X (Categorías para las horas)
+        CategoryAxis xAxis = new CategoryAxis();
+        xAxis.setLabel("Time");
         
-        // Crear la gráfica de registro de batería 
-        NumberAxis xAxis = new NumberAxis(); 
-        NumberAxis yAxis = new NumberAxis(); 
-        LineChart<Number, Number> batteryChart = new LineChart<>(xAxis, yAxis); 
-        batteryChart.setTitle("Registro de Batería");
+        // Crear el eje Y (Porcentaje numérico)
+        NumberAxis yAxis = new NumberAxis();
+        yAxis.setLabel("Percentage (%)");
+        
+        // Crear la gráfica de registro de batería
+        LineChart<String, Number> batteryChart = new LineChart<>(xAxis, yAxis);
+        batteryChart.setTitle("Battery Log");
         
         // Añadir datos ficticios a la gráfica 
-        XYChart.Series<Number, Number> series = new XYChart.Series<>(); 
-        series.getData().add(new XYChart.Data<>(1, Integer.parseInt(percentageLabel1.getText().replace("%", "")))); 
-        series.getData().add(new XYChart.Data<>(2, Integer.parseInt(percentageLabel2.getText().replace("%", "")))); 
-        series.getData().add(new XYChart.Data<>(3, Integer.parseInt(percentageLabel3.getText().replace("%", ""))));
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        series.setName("Battery Percentage"); 
+        
+        for (RegisterEntry entry : registerEntries) { 
+        	series.getData().add(new XYChart.Data<>(entry.getTime(), Integer.parseInt(entry.getPercentage().replace("%", "")))); 
+        }
+        
+        // Añadir la serie a la gráfica
         batteryChart.getData().add(series);
         
         // Crear el contenedor principal y añadir las dos mitades 
@@ -394,6 +409,7 @@ public class BatteryManager extends Application {
 
         return detailBox;
     }
+    
     
     private void startBatteryInfoUpdater() {
         Thread updaterThread = new Thread(() -> {
@@ -447,6 +463,9 @@ public class BatteryManager extends Application {
             // Validar que currentCapacity y maxCapacity
             if (currentCapacity > 0 && maxCapacity > 0) {
             	double remainingCapacity = (currentCapacity / maxCapacity) * 100;
+            	boolean isCurrentlyCharging = powerSource.isCharging();
+            	
+            	updateBatteryStatus(remainingCapacity, isCurrentlyCharging);
 
                 Platform.runLater(() -> {
                 	batteryPercentage.setText(String.format("%.0f", remainingCapacity) + "%");
@@ -479,6 +498,27 @@ public class BatteryManager extends Application {
 					speedCharge.setText("Unknown");
 				});
 			}
+        }
+    }
+    
+    private void updateBatteryStatus(double currentBatteryLevel, boolean isCurrentlyCharging) { 
+    	LocalDateTime currentTime = LocalDateTime.now(); 
+        String formattedTime = currentTime.format(DateTimeFormatter.ofPattern("HH:mm")); 
+        String formattedDate = currentTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        String percentage = String.format("%.0f%%", currentBatteryLevel); 
+        String icon = "🔌";
+
+        if ((isCurrentlyCharging && !isCharging) || (!isCurrentlyCharging && isCharging)) { 
+            // Cambió el estado de carga 
+            Platform.runLater(() -> { 
+                registerEntries.add(new RegisterEntry(icon, formattedDate, percentage, formattedTime)); 
+                contentArea.getChildren().add(createRegisterBox(icon, formattedDate, new Label(percentage), formattedTime));
+                showHistory();
+            });
+
+            // Actualizar el estado actual 
+            isCharging = isCurrentlyCharging; 
         }
     }
     
